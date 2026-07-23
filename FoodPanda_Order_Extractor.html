@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FoodPanda Order Extractor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; min-height: 100vh; padding: 24px 16px; }
+  .container { max-width: 640px; margin: 0 auto; }
+  h1 { font-size: 20px; font-weight: 600; color: #E65100; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #888; margin-bottom: 24px; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid #eee; padding: 16px 20px; margin-bottom: 16px; }
+  .card-title { font-size: 13px; font-weight: 500; color: #555; margin-bottom: 12px; }
+  label { font-size: 12px; color: #888; display: block; margin-bottom: 4px; }
+  input[type=text], select, textarea { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; color: #222; background: #fafafa; outline: none; }
+  input[type=text]:focus, select:focus { border-color: #E65100; background: #fff; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .full { grid-column: 1 / -1; }
+  .dropzone { border: 2px dashed #ddd; border-radius: 12px; padding: 32px; text-align: center; cursor: pointer; background: #fafafa; transition: all 0.15s; }
+  .dropzone:hover, .dropzone.dragover { border-color: #E65100; background: #FFF3E0; }
+  .dropzone-icon { font-size: 36px; margin-bottom: 8px; }
+  .dropzone p { color: #888; font-size: 14px; }
+  .dropzone small { color: #bbb; font-size: 12px; }
+  #preview { display: none; width: 100%; max-height: 280px; object-fit: contain; border-radius: 8px; border: 1px solid #eee; margin-top: 12px; }
+  button { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; background: #fff; color: #333; transition: all 0.15s; }
+  button:hover { background: #f5f5f5; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: #E65100; color: #fff; border-color: #E65100; }
+  .btn-primary:hover { background: #BF360C; }
+  .btn-green { background: #2E7D32; color: #fff; border-color: #2E7D32; }
+  .btn-green:hover { background: #1B5E20; }
+  .btn-blue { background: #1565C0; color: #fff; border-color: #1565C0; }
+  .btn-blue:hover { background: #0D47A1; }
+  .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .status { font-size: 13px; text-align: center; padding: 8px; border-radius: 8px; margin-top: 8px; min-height: 36px; display: flex; align-items: center; justify-content: center; }
+  .status.success { background: #E8F5E9; color: #2E7D32; }
+  .status.error { background: #FFEBEE; color: #C62828; }
+  .status.info { background: #E3F2FD; color: #1565C0; }
+  .status.loading { background: #FFF3E0; color: #E65100; }
+  pre { white-space: pre-wrap; font-family: inherit; font-size: 13px; color: #333; line-height: 1.6; }
+  .copy-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .copy-row span { font-size: 13px; font-weight: 500; color: #555; }
+  .btn-copy { width: auto; padding: 4px 12px; font-size: 12px; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 500; }
+  .tag-fp { background: #FFF3E0; color: #E65100; }
+  .tag-wkk { background: #E3F2FD; color: #1565C0; }
+  .file-input-row { display: flex; align-items: center; gap: 10px; }
+  .file-label { flex: 1; padding: 8px 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 13px; color: #888; background: #fafafa; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .file-label:hover { border-color: #E65100; }
+  input[type=file] { display: none; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>FoodPanda Order Extractor</h1>
+  <p class="subtitle">Upload a portal screenshot → extract details → save to Google Sheet</p>
+
+  <!-- Step 1: Setup -->
+  <div class="card">
+    <p class="card-title">1. Setup</p>
+    <div class="grid2">
+      <div>
+        <label>Brand</label>
+        <select id="brand">
+          <option value="mixue">Mixue</option>
+          <option value="wakaka">WaKaKa</option>
+        </select>
+      </div>
+      <div>
+        <label>Service Account JSON</label>
+        <div class="file-input-row">
+          <label class="file-label" for="jsonFile" id="jsonLabel">Choose JSON file...</label>
+          <input type="file" id="jsonFile" accept=".json" />
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Upload image -->
+  <div class="card">
+    <p class="card-title">2. Upload screenshot</p>
+    <div class="dropzone" id="dropzone">
+      <div class="dropzone-icon">📋</div>
+      <p>Press <strong>Ctrl+V</strong> to paste screenshot</p>
+      <small>Take screenshot first, then paste here</small>
+    </div>
+    <img id="preview" alt="Preview" />
+    <button id="extractBtn" class="btn-primary" style="margin-top: 12px;" disabled>Extract order details</button>
+  </div>
+
+  <!-- Step 3: Review -->
+  <div class="card" id="reviewCard" style="display: none;">
+    <p class="card-title">3. Review extracted details</p>
+    <div class="grid2">
+      <div>
+        <label>Order ID</label>
+        <input type="text" id="f_orderid" />
+      </div>
+      <div>
+        <label>Outlet</label>
+        <input type="text" id="f_outlet" />
+      </div>
+      <div>
+        <label>Amount (RM)</label>
+        <input type="text" id="f_amount" />
+      </div>
+      <div>
+        <label>Issue Type</label>
+        <input type="text" id="f_issue" />
+      </div>
+      <div class="full">
+        <label>Items</label>
+        <input type="text" id="f_items" />
+      </div>
+      <div class="full">
+        <label>Order Date (yyyy-MM-dd HH:mm:ss)</label>
+        <input type="text" id="f_date" />
+      </div>
+    </div>
+    <div class="btn-row" style="margin-top: 14px;">
+      <button id="saveBtn" class="btn-green">💾 Save to Google Sheet</button>
+      <button id="msgBtn" class="btn-blue">💬 Generate message</button>
+    </div>
+  </div>
+
+  <!-- Message -->
+  <div class="card" id="msgCard" style="display: none;">
+    <div class="copy-row">
+      <span>Message template</span>
+      <button class="btn-copy" id="copyBtn">Copy</button>
+    </div>
+    <pre id="msgText"></pre>
+  </div>
+
+  <div class="status info" id="status">Upload your service account JSON and a screenshot to get started.</div>
+</div>
+
+<script>
+const MIXUE_SHEET_ID = '1yenudp01MffCPvviUM7icw5-PamdAR_ZtTdE0PGvM6c';
+const WAKAKA_SHEET_ID = '1jmAHNtegmXw_In2l7QQHfoPvnv0mvjiU-qQCHNSB54w';
+
+let imgBase64 = null, imgMime = null, serviceKey = null;
+
+function setStatus(msg, type = 'info') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = 'status ' + type;
+}
+
+// JSON file
+document.getElementById('jsonFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  document.getElementById('jsonLabel').textContent = f.name;
+  const r = new FileReader();
+  r.onload = ev => {
+    try {
+      serviceKey = JSON.parse(ev.target.result);
+      setStatus('Service account loaded: ' + serviceKey.client_email, 'success');
+    } catch { setStatus('Invalid JSON file.', 'error'); }
+  };
+  r.readAsText(f);
+});
+
+// Image upload - paste support
+const dropzone = document.getElementById('dropzone');
+
+// Click dropzone to focus for paste
+dropzone.addEventListener('click', () => { dropzone.focus(); setStatus('Ready — press Ctrl+V to paste your screenshot.', 'info'); });
+dropzone.setAttribute('tabindex', '0');
+
+// Listen for paste anywhere on page
+document.addEventListener('paste', e => {
+  const items = e.clipboardData && e.clipboardData.items;
+  if (!items) return;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.startsWith('image/')) {
+      const file = items[i].getAsFile();
+      if (file) { handleImage(file); break; }
+    }
+  }
+});
+
+// Also support drag & drop as backup
+dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleImage(e.dataTransfer.files[0]);
+});
+
+function handleImage(file) {
+  imgMime = file.type;
+  const r = new FileReader();
+  r.onload = ev => {
+    imgBase64 = ev.target.result.split(',')[1];
+    const preview = document.getElementById('preview');
+    preview.src = ev.target.result;
+    preview.style.display = 'block';
+    document.getElementById('extractBtn').disabled = false;
+    document.getElementById('reviewCard').style.display = 'none';
+    document.getElementById('msgCard').style.display = 'none';
+    setStatus('Image loaded. Click "Extract order details".', 'info');
+  };
+  r.readAsDataURL(file);
+}
+
+// Extract
+document.getElementById('extractBtn').addEventListener('click', async () => {
+  if (!imgBase64) return;
+  document.getElementById('extractBtn').disabled = true;
+  setStatus('Analysing screenshot...', 'loading');
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: imgMime, data: imgBase64 } },
+            { type: 'text', text: 'Extract order details from this FoodPanda portal screenshot. The "amount" should ONLY be the total value of the cancelled/struck-through/removed items (shown in red with strikethrough), NOT the full order subtotal. Return ONLY a valid JSON object with these exact keys: orderId, outlet, amount (number only, no RM, only the deducted/removed items value), issueType (e.g. Wrong item, Missing item, Food quality issue, Avoidable cancellation), items (only the cancelled/struck-through items, comma separated), orderDate (yyyy-MM-dd HH:mm:ss, use today date if not visible). No markdown, no backticks, no explanation. Just the JSON.' }
+          ]
+        }]
+      })
+    });
+    const data = await res.json();
+    const text = data.content[0].text.replace(/```json|```/g, '').trim();
+    const extracted = JSON.parse(text);
+    document.getElementById('f_orderid').value = extracted.orderId || '';
+    document.getElementById('f_outlet').value = extracted.outlet || '';
+    document.getElementById('f_amount').value = extracted.amount || '';
+    document.getElementById('f_issue').value = extracted.issueType || '';
+    document.getElementById('f_items').value = extracted.items || '';
+    document.getElementById('f_date').value = extracted.orderDate || '';
+    document.getElementById('reviewCard').style.display = 'block';
+    setStatus('Details extracted. Review and confirm before saving.', 'success');
+  } catch(e) {
+    setStatus('Extract failed: ' + e.message, 'error');
+  }
+  document.getElementById('extractBtn').disabled = false;
+});
+
+// Save to Sheet
+document.getElementById('saveBtn').addEventListener('click', async () => {
+  if (!serviceKey) { setStatus('Please upload service account JSON first.', 'error'); return; }
+  const brand = document.getElementById('brand').value;
+  const sheetId = brand === 'mixue' ? MIXUE_SHEET_ID : WAKAKA_SHEET_ID;
+  const today = new Date().toISOString().replace('T', ' ').substring(0, 19);
+  const row = [
+    document.getElementById('f_date').value || today,
+    document.getElementById('f_outlet').value,
+    document.getElementById('f_orderid').value,
+    parseFloat(document.getElementById('f_amount').value) || '',
+    document.getElementById('f_issue').value,
+    document.getElementById('f_items').value,
+    '', '', '', '', '', '', '', '', '', ''
+  ];
+  setStatus('Getting access token...', 'loading');
+  try {
+    const token = await getAccessToken(serviceKey);
+    setStatus('Saving to Google Sheet...', 'loading');
+    const appendRes = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}/values/FoodPanda!A:P:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: [row] })
+      }
+    );
+    if (appendRes.ok) {
+      setStatus('Saved to Google Sheet successfully!', 'success');
+    } else {
+      const err = await appendRes.json();
+      setStatus('Save failed: ' + (err.error?.message || 'Unknown error'), 'error');
+    }
+  } catch(e) {
+    setStatus('Error: ' + e.message, 'error');
+  }
+});
+
+// Generate message
+document.getElementById('msgBtn').addEventListener('click', () => {
+  const outlet = document.getElementById('f_outlet').value;
+  const issue = document.getElementById('f_issue').value;
+  const date = (document.getElementById('f_date').value || '').split(' ')[0];
+  const msg = `Outlet: ${outlet}\nPlatform: FoodPanda\nDate: ${date}\nStatus: Cancelled Order\nReason: ${issue}\nAction Taken: This is your 1st incident this month. Please ensure all orders are prepared correctly. A repeat incident will result in a salary deduction. Thank you.`;
+  document.getElementById('msgText').textContent = msg;
+  document.getElementById('msgCard').style.display = 'block';
+  setStatus('Message generated. Click Copy to copy.', 'success');
+});
+
+// Copy
+document.getElementById('copyBtn').addEventListener('click', () => {
+  const text = document.getElementById('msgText').textContent;
+  navigator.clipboard.writeText(text).then(() => setStatus('Copied to clipboard!', 'success'));
+});
+
+// JWT / Access Token
+async function getAccessToken(key) {
+  const now = Math.floor(Date.now() / 1000);
+  const b64url = s => btoa(s).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = b64url(JSON.stringify({
+    iss: key.client_email,
+    scope: 'https://www.googleapis.com/auth/spreadsheets',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  }));
+  const unsigned = header + '.' + payload;
+  const pemContents = key.private_key.replace(/-----BEGIN PRIVATE KEY-----|-----END PRIVATE KEY-----|\n/g, '');
+  const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('pkcs8', binaryKey.buffer, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, new TextEncoder().encode(unsigned));
+  const sig = btoa(String.fromCharCode(...new Uint8Array(signature))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');
+  const jwt = unsigned + '.' + sig;
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`
+  });
+  const tokenData = await tokenRes.json();
+  if (!tokenData.access_token) throw new Error(tokenData.error_description || 'Token request failed');
+  return tokenData.access_token;
+}
+</script>
+</body>
+</html>
